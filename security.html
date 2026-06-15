@@ -14,153 +14,223 @@
       --muted: #cbd5e1;
       --green: #22c55e;
       --red: #ef4444;
-      --yellow: #f59e0b;
       --blue: #38bdf8;
       --orange: #f97316;
+      --border: rgba(255,255,255,0.12);
     }
 
     * {
       box-sizing: border-box;
     }
 
+    html,
     body {
       margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
       background: var(--bg);
       color: var(--text);
       font-family: Arial, sans-serif;
-      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    body {
+      height: 100dvh;
     }
 
     .app {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 14px;
+      height: 100dvh;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 10px;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr auto;
+      gap: 8px;
     }
 
     .card {
       background: var(--card);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 18px;
-      padding: 14px;
-      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 10px;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.28);
     }
 
     .top-card {
       background: linear-gradient(135deg, #1e293b, #0f172a);
     }
 
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
     .title {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 900;
-      margin: 0 0 6px;
-    }
-
-    .sub {
-      color: var(--muted);
-      font-size: 14px;
       margin: 0;
-      line-height: 1.4;
+      line-height: 1.1;
     }
 
-    .device-pill {
-      display: inline-flex;
-      margin-top: 10px;
-      padding: 7px 10px;
-      border-radius: 999px;
-      background: rgba(56, 189, 248, 0.16);
+    .device {
+      font-size: 11px;
       color: #bae6fd;
-      font-size: 13px;
+      background: rgba(56, 189, 248, 0.14);
+      padding: 5px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
       font-weight: 700;
     }
 
-    label {
-      display: block;
-      font-size: 13px;
+    .kpis {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .kpi {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .kpi-number {
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .kpi-label {
+      font-size: 12px;
       color: var(--muted);
-      margin-bottom: 6px;
       font-weight: 700;
     }
 
-    input {
+    .search-wrap {
+      position: relative;
+      z-index: 10;
+    }
+
+    .search-input {
       width: 100%;
-      border: 1px solid rgba(255,255,255,0.16);
+      border: 1px solid var(--border);
       background: #020617;
       color: var(--text);
       border-radius: 14px;
       padding: 14px 12px;
-      font-size: 16px;
+      font-size: 17px;
+      font-weight: 700;
       outline: none;
     }
 
-    .employee-list {
-      margin-top: 10px;
-      max-height: 280px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+    .search-input::placeholder {
+      color: #64748b;
+      font-weight: 600;
     }
 
-    .employee-item {
-      width: 100%;
-      text-align: left;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: #1f2937;
-      color: #ffffff;
+    .dropdown {
+      display: none;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      background: #020617;
+      border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 12px;
+      overflow: hidden;
+      max-height: 230px;
+      overflow-y: auto;
+      box-shadow: 0 14px 32px rgba(0,0,0,0.45);
+    }
+
+    .dropdown.show {
+      display: block;
+    }
+
+    .option {
+      width: 100%;
+      border: none;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: #020617;
+      color: #ffffff;
+      text-align: left;
+      padding: 10px 12px;
       cursor: pointer;
     }
 
-    .employee-item strong {
-      display: block;
-      font-size: 15px;
-      margin-bottom: 3px;
+    .option:last-child {
+      border-bottom: none;
     }
 
-    .employee-item span {
+    .option:active {
+      background: #1e293b;
+    }
+
+    .option-name {
       display: block;
+      font-size: 15px;
+      font-weight: 900;
+      line-height: 1.25;
+    }
+
+    .option-meta {
+      display: block;
+      font-size: 11px;
       color: var(--muted);
-      font-size: 13px;
-      line-height: 1.35;
+      margin-top: 3px;
+      line-height: 1.25;
     }
 
     .selected-card {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
       background: var(--card2);
     }
 
-    .selected-name {
-      font-size: 22px;
+    .empty-selected {
+      color: #94a3b8;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .emp-name {
+      font-size: 21px;
       font-weight: 900;
       margin-bottom: 6px;
+      line-height: 1.15;
     }
 
-    .selected-meta {
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.5;
-      white-space: pre-line;
-    }
-
-    .status-badge {
-      display: inline-flex;
-      margin-top: 12px;
-      padding: 8px 10px;
-      border-radius: 999px;
+    .emp-details {
       font-size: 13px;
-      font-weight: 900;
-      background: rgba(56, 189, 248, 0.16);
-      color: #bae6fd;
+      color: var(--muted);
+      line-height: 1.45;
     }
 
-    .status-with {
-      background: rgba(34, 197, 94, 0.16);
+    .status-pill {
+      display: inline-flex;
+      align-self: flex-start;
+      margin-top: 8px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .with-security {
+      background: rgba(34, 197, 94, 0.15);
       color: #bbf7d0;
     }
 
-    .status-returned {
+    .not-submitted {
       background: rgba(249, 115, 22, 0.16);
       color: #fed7aa;
     }
@@ -169,12 +239,12 @@
       width: 100%;
       border: none;
       border-radius: 16px;
-      padding: 18px 12px;
+      padding: 16px 12px;
       font-size: 20px;
       font-weight: 900;
       color: #ffffff;
-      margin-top: 14px;
       cursor: pointer;
+      min-height: 58px;
     }
 
     .submit-btn {
@@ -190,56 +260,78 @@
       cursor: not-allowed;
     }
 
-    .message {
-      background: var(--card2);
-      border-radius: 16px;
-      padding: 14px;
-      font-size: 15px;
-      line-height: 1.45;
-      white-space: pre-line;
-      border: 1px solid rgba(255,255,255,0.12);
-    }
-
-    .message.success {
-      border-color: rgba(34,197,94,0.45);
-      color: #bbf7d0;
-    }
-
-    .message.error {
-      border-color: rgba(239,68,68,0.45);
-      color: #fecaca;
-    }
-
-    .message.info {
-      border-color: rgba(56,189,248,0.35);
-      color: #bae6fd;
-    }
-
-    .small-row {
-      display: flex;
-      gap: 10px;
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
 
     .small-btn {
-      flex: 1;
       border: none;
       border-radius: 14px;
-      padding: 13px;
-      font-size: 15px;
+      padding: 11px;
+      font-size: 14px;
       font-weight: 800;
       color: #ffffff;
       background: #475569;
       cursor: pointer;
     }
 
+    .msg {
+      font-size: 12px;
+      color: #bae6fd;
+      text-align: center;
+      min-height: 18px;
+      line-height: 1.35;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .msg.error {
+      color: #fecaca;
+    }
+
+    .msg.success {
+      color: #bbf7d0;
+    }
+
     .hidden {
       display: none;
     }
 
-    @media (min-width: 700px) {
+    @media (max-height: 650px) {
       .app {
-        max-width: 560px;
-        margin: 0 auto;
+        gap: 6px;
+        padding: 8px;
+      }
+
+      .card {
+        padding: 8px;
+        border-radius: 14px;
+      }
+
+      .title {
+        font-size: 20px;
+      }
+
+      .kpi-number {
+        font-size: 22px;
+      }
+
+      .search-input {
+        padding: 12px;
+        font-size: 16px;
+      }
+
+      .emp-name {
+        font-size: 19px;
+      }
+
+      .action-btn {
+        min-height: 52px;
+        padding: 13px;
+        font-size: 18px;
       }
     }
   </style>
@@ -247,42 +339,70 @@
 
 <body>
   <div class="app">
+
     <div class="card top-card">
-      <h1 class="title">Phone Handover</h1>
-      <p class="sub">
-        Search the employee, select the name, then submit or return the phone.
-      </p>
-      <div class="device-pill">
-        Device: <span id="deviceLabel" style="margin-left:6px;"></span>
+      <div class="title-row">
+        <h1 class="title">Phone Handover</h1>
+        <div class="device" id="deviceLabel">Device</div>
       </div>
     </div>
 
-    <div id="messageBox" class="message info">
-      Loading employees...
+    <div class="kpis">
+      <div class="kpi">
+        <div id="handedCount" class="kpi-number">0</div>
+        <div class="kpi-label">Handed Phones</div>
+      </div>
+
+      <div class="kpi">
+        <div id="toHandoverCount" class="kpi-number">0</div>
+        <div class="kpi-label">To Handover</div>
+      </div>
     </div>
 
-    <div class="card">
-      <label for="searchInput">Search by employee name or ID</label>
-      <input id="searchInput" type="text" placeholder="Type name or employee ID..." oninput="renderEmployeeList()">
+    <div class="search-wrap">
+      <input
+        id="searchInput"
+        class="search-input"
+        type="text"
+        placeholder="Search name or ID..."
+        autocomplete="off"
+        onfocus="showDropdown()"
+        onclick="showDropdown()"
+        oninput="renderDropdown()"
+      >
 
-      <div id="employeeList" class="employee-list"></div>
+      <div id="dropdown" class="dropdown"></div>
     </div>
 
-    <div id="selectedCard" class="card selected-card hidden">
-      <div id="selectedName" class="selected-name"></div>
-      <div id="selectedMeta" class="selected-meta"></div>
-      <div id="selectedStatus" class="status-badge"></div>
+    <div id="selectedCard" class="card selected-card">
+      <div id="emptyState" class="empty-selected">
+        Select an employee to update phone status.
+      </div>
 
-      <button id="actionButton" class="action-btn" onclick="submitPhoneAction()"></button>
+      <div id="employeeDetails" class="hidden">
+        <div id="empName" class="emp-name"></div>
+        <div id="empDetails" class="emp-details"></div>
+        <div id="empStatus" class="status-pill"></div>
+      </div>
     </div>
 
-    <div class="small-row">
-      <button class="small-btn" onclick="loadEmployees()">Refresh</button>
-      <button class="small-btn" onclick="clearSelection()">Clear</button>
+    <div>
+      <button id="actionButton" class="action-btn submit-btn" onclick="submitPhoneAction()" disabled>
+        Select Employee
+      </button>
+
+      <div class="bottom-row" style="margin-top:8px;">
+        <button class="small-btn" onclick="loadEmployees()">Refresh</button>
+        <button class="small-btn" onclick="clearSelection()">Clear</button>
+      </div>
+
+      <div id="messageBox" class="msg">Loading employees...</div>
     </div>
+
   </div>
 
   <script>
+    // Use the same Apps Script backend URL used by your GitHub scanner page.
     const BACKEND_URL = "https://script.google.com/macros/s/AKfycbz0Vbx-a7tijTMiSoRJFveiPfIUZvHULf2Iy5dx7Sq2Zww5iHSpQaLKH69DOntdCinu/exec";
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -297,16 +417,23 @@
 
     window.addEventListener("load", function () {
       if (!BACKEND_URL || BACKEND_URL.includes("PASTE_YOUR")) {
-        showMessage("Backend URL is missing in security.html.", "error");
+        showMessage("Backend URL missing.", "error");
         return;
       }
 
       if (!DEVICE_ID || !TOKEN) {
-        showMessage("Open this page with device_id and token in the URL.", "error");
+        showMessage("Device ID or token missing in URL.", "error");
         return;
       }
 
       loadEmployees();
+    });
+
+    document.addEventListener("click", function (event) {
+      const searchWrap = document.querySelector(".search-wrap");
+      if (!searchWrap.contains(event.target)) {
+        hideDropdown();
+      }
     });
 
     function callApi(apiName, params, callback) {
@@ -339,14 +466,14 @@
 
       script.onerror = function() {
         delete window[callbackName];
-        showMessage("Network error. Could not contact Apps Script backend.", "error");
+        showMessage("Network error.", "error");
       };
 
       document.body.appendChild(script);
     }
 
     function loadEmployees() {
-      showMessage("Loading employees...", "info");
+      showMessage("Loading employees...", "");
 
       callApi("phoneEmployees", {}, function(response) {
         if (!response || !response.success) {
@@ -356,18 +483,22 @@
 
         employees = (response.data && response.data.employees) ? response.data.employees : [];
 
-        renderEmployeeList();
+        updateKpis();
+        renderDropdown();
 
         if (employees.length === 0) {
-          showMessage("No active phone-required employees found.", "info");
+          showMessage("No phone-required employees.", "");
         } else {
-          showMessage("Employees loaded: " + employees.length, "success");
+          showMessage("Employees loaded.", "success");
         }
 
         if (selectedEmployee) {
-          const updated = employees.find(e => e.employee_id === selectedEmployee.employee_id);
+          const updated = employees.find(function(emp) {
+            return emp.employee_id === selectedEmployee.employee_id;
+          });
+
           if (updated) {
-            selectEmployee(updated.employee_id);
+            selectEmployee(updated.employee_id, false);
           } else {
             clearSelection();
           }
@@ -375,45 +506,80 @@
       });
     }
 
-    function renderEmployeeList() {
-      const list = document.getElementById("employeeList");
+    function updateKpis() {
+      const handed = employees.filter(function(emp) {
+        return emp.current_status === "WITH_SECURITY";
+      }).length;
+
+      const toHandover = employees.length - handed;
+
+      document.getElementById("handedCount").innerText = handed;
+      document.getElementById("toHandoverCount").innerText = toHandover;
+    }
+
+    function showDropdown() {
+      renderDropdown();
+      document.getElementById("dropdown").classList.add("show");
+    }
+
+    function hideDropdown() {
+      document.getElementById("dropdown").classList.remove("show");
+    }
+
+    function renderDropdown() {
+      const dropdown = document.getElementById("dropdown");
       const search = document.getElementById("searchInput").value.trim().toLowerCase();
 
-      list.innerHTML = "";
+      dropdown.innerHTML = "";
 
-      const filtered = employees.filter(function(emp) {
+      let filtered = employees.filter(function(emp) {
         const text = (
           emp.employee_id + " " +
           emp.full_name + " " +
-          emp.department + " " +
-          emp.current_status
+          emp.department
         ).toLowerCase();
 
         return text.includes(search);
-      }).slice(0, 30);
+      });
+
+      filtered = filtered.slice(0, 12);
 
       if (filtered.length === 0) {
-        list.innerHTML = '<div class="message info">No matching employees.</div>';
+        const empty = document.createElement("button");
+        empty.className = "option";
+        empty.type = "button";
+        empty.innerHTML =
+          '<span class="option-name">No matching employees</span>' +
+          '<span class="option-meta">Try another name or ID</span>';
+        dropdown.appendChild(empty);
         return;
       }
 
       filtered.forEach(function(emp) {
         const btn = document.createElement("button");
-        btn.className = "employee-item";
-        btn.onclick = function() {
-          selectEmployee(emp.employee_id);
+        btn.type = "button";
+        btn.className = "option";
+
+        btn.onmousedown = function(event) {
+          event.preventDefault();
+          selectEmployee(emp.employee_id, true);
         };
 
         btn.innerHTML =
-          "<strong>" + escapeHtml(emp.full_name) + "</strong>" +
-          "<span>" + escapeHtml(emp.employee_id) + " • " + escapeHtml(emp.department || "-") + "</span>" +
-          "<span>Status: " + escapeHtml(emp.current_status) + "</span>";
+          '<span class="option-name">' + escapeHtml(emp.full_name) + '</span>' +
+          '<span class="option-meta">' +
+            escapeHtml(emp.employee_id) +
+            ' • ' +
+            escapeHtml(emp.department || "-") +
+            ' • ' +
+            escapeHtml(formatStatusText(emp.current_status)) +
+          '</span>';
 
-        list.appendChild(btn);
+        dropdown.appendChild(btn);
       });
     }
 
-    function selectEmployee(employeeId) {
+    function selectEmployee(employeeId, hideList) {
       selectedEmployee = employees.find(function(emp) {
         return emp.employee_id === employeeId;
       });
@@ -423,30 +589,41 @@
         return;
       }
 
-      document.getElementById("selectedCard").classList.remove("hidden");
+      document.getElementById("searchInput").value =
+        selectedEmployee.full_name + " (" + selectedEmployee.employee_id + ")";
 
-      document.getElementById("selectedName").innerText = selectedEmployee.full_name;
+      document.getElementById("emptyState").classList.add("hidden");
+      document.getElementById("employeeDetails").classList.remove("hidden");
 
-      document.getElementById("selectedMeta").innerText =
-        "ID: " + selectedEmployee.employee_id +
+      document.getElementById("empName").innerText = selectedEmployee.full_name;
+
+      document.getElementById("empDetails").innerText =
+        "Employee ID: " + selectedEmployee.employee_id +
         "\nDepartment: " + (selectedEmployee.department || "-") +
-        "\nDesignation: " + (selectedEmployee.designation || "-") +
-        "\nLast action: " + (selectedEmployee.last_action_time || "-");
+        "\nLast action: " + formatLastAction(selectedEmployee.current_status) +
+        "\nTime: " + (selectedEmployee.last_action_time || "-");
 
-      const statusEl = document.getElementById("selectedStatus");
-      statusEl.innerText = "Current Status: " + selectedEmployee.current_status;
-      statusEl.className = "status-badge";
+      const statusEl = document.getElementById("empStatus");
+      statusEl.innerText = "Current: " + formatStatusText(selectedEmployee.current_status);
+      statusEl.className = "status-pill";
 
       const actionButton = document.getElementById("actionButton");
+      actionButton.disabled = false;
 
       if (selectedEmployee.current_status === "WITH_SECURITY") {
-        statusEl.classList.add("status-with");
+        statusEl.classList.add("with-security");
         actionButton.innerText = "Phone Returned";
         actionButton.className = "action-btn return-btn";
       } else {
-        statusEl.classList.add("status-returned");
+        statusEl.classList.add("not-submitted");
         actionButton.innerText = "Phone Submitted";
         actionButton.className = "action-btn submit-btn";
+      }
+
+      showMessage("", "");
+
+      if (hideList) {
+        hideDropdown();
       }
     }
 
@@ -458,41 +635,75 @@
         : "HANDED_OVER";
 
       processing = true;
-      document.getElementById("actionButton").disabled = true;
 
-      showMessage("Updating phone status...", "info");
+      const actionButton = document.getElementById("actionButton");
+      actionButton.disabled = true;
+      actionButton.innerText = "Updating...";
+
+      showMessage("Updating...", "");
 
       callApi("phoneEvent", {
         employee_id: selectedEmployee.employee_id,
         action: action
       }, function(response) {
         processing = false;
-        document.getElementById("actionButton").disabled = false;
 
         if (!response || !response.success) {
           showMessage(response ? response.message : "Update failed.", "error");
+          refreshSelectedButton();
           return;
         }
 
-        showMessage(response.message + "\nServer: " + response.server_time, "success");
-
+        showMessage(response.message, "success");
         vibrateSuccess();
 
         loadEmployees();
       });
     }
 
+    function refreshSelectedButton() {
+      if (!selectedEmployee) {
+        document.getElementById("actionButton").disabled = true;
+        document.getElementById("actionButton").innerText = "Select Employee";
+        return;
+      }
+
+      selectEmployee(selectedEmployee.employee_id, false);
+    }
+
     function clearSelection() {
       selectedEmployee = null;
-      document.getElementById("selectedCard").classList.add("hidden");
+
       document.getElementById("searchInput").value = "";
-      renderEmployeeList();
+      document.getElementById("emptyState").classList.remove("hidden");
+      document.getElementById("employeeDetails").classList.add("hidden");
+
+      const actionButton = document.getElementById("actionButton");
+      actionButton.disabled = true;
+      actionButton.innerText = "Select Employee";
+      actionButton.className = "action-btn submit-btn";
+
+      renderDropdown();
+      hideDropdown();
+      showMessage("", "");
+    }
+
+    function formatStatusText(status) {
+      if (status === "WITH_SECURITY") return "With Security";
+      if (status === "RETURNED") return "Returned";
+      return "Not Submitted";
+    }
+
+    function formatLastAction(status) {
+      if (status === "WITH_SECURITY") return "Phone Submitted";
+      if (status === "RETURNED") return "Phone Returned";
+      return "-";
     }
 
     function showMessage(text, type) {
       const box = document.getElementById("messageBox");
-      box.className = "message " + (type || "info");
-      box.innerText = text;
+      box.className = "msg " + (type || "");
+      box.innerText = text || "";
     }
 
     function vibrateSuccess() {

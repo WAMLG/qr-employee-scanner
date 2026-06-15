@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>Gate Attendance Scanner</title>
+  <title>QR Scanner</title>
 
   <script src="https://unpkg.com/html5-qrcode"></script>
 
@@ -173,10 +173,8 @@
 <body>
   <div class="app">
     <div class="top-card">
-      <h1 class="title">Gate Attendance Scanner</h1>
-      <p class="sub">
-        Scan employee QR cards at the gate. Valid scans will be saved to the attendance system.
-      </p>
+      <h1 id="pageTitle" class="title">QR Scanner</h1>
+      <p id="pageDescription" class="sub"></p>
       <div class="device-pill">
         Device: <span id="deviceLabel" style="margin-left:6px;"></span>
       </div>
@@ -207,9 +205,29 @@
     const BACKEND_URL = "https://script.google.com/macros/s/AKfycbz0Vbx-a7tijTMiSoRJFveiPfIUZvHULf2Iy5dx7Sq2Zww5iHSpQaLKH69DOntdCinu/exec";
 
     const urlParams = new URLSearchParams(window.location.search);
-
+    
+    const MODE = (urlParams.get("mode") || "gate").toLowerCase();
     const DEVICE_ID = urlParams.get("device_id") || "";
     const TOKEN = urlParams.get("token") || "";
+    
+    const API_NAME = MODE === "lunch" ? "lunchScan" : "gateScan";
+    
+    const PAGE_CONFIG = {
+      gate: {
+        title: "Gate Attendance Scanner",
+        description: "Scan employee QR cards at the gate. Valid scans will be saved to the attendance system.",
+        readyText: "Tap Start Camera and scan an employee QR.",
+        scanningText: "Camera is active. Show the employee QR card."
+      },
+      lunch: {
+        title: "Lunch Room Scanner",
+        description: "Scan employee QR cards at the lunch room. The system will record lunch entry and exit.",
+        readyText: "Tap Start Camera and scan an employee QR.",
+        scanningText: "Camera is active. Show the employee QR card for lunch entry or exit."
+      }
+    };
+    
+    const CURRENT_PAGE = PAGE_CONFIG[MODE] || PAGE_CONFIG.gate;
 
     let html5QrCode = null;
     let scannerRunning = false;
@@ -218,6 +236,9 @@
     let lastLocalTime = 0;
 
     document.getElementById("deviceLabel").innerText = DEVICE_ID || "Missing";
+    document.getElementById("pageTitle").innerText = CURRENT_PAGE.title;
+    document.getElementById("pageDescription").innerText = CURRENT_PAGE.description;
+    document.title = CURRENT_PAGE.title;
 
     window.addEventListener("load", function () {
       if (!BACKEND_URL || BACKEND_URL.includes("PASTE_YOUR")) {
@@ -236,7 +257,7 @@
         return;
       }
 
-      setStatus("idle", "Ready", "Tap Start Camera and allow camera permission.");
+      setStatus("idle", "Ready", CURRENT_PAGE.readyText);
     });
 
     function startScanner() {
@@ -270,7 +291,7 @@
         scannerRunning = true;
         document.getElementById("startBtn").disabled = true;
         document.getElementById("stopBtn").disabled = false;
-        setStatus("idle", "Scanning", "Camera is active. Show the employee QR card.");
+        setStatus("idle", "Scanning", CURRENT_PAGE.scanningText);
       }).catch(function (err) {
         setStatus(
           "error",
@@ -336,7 +357,7 @@
 
       const apiUrl =
         BACKEND_URL +
-        "?api=gateScan" +
+        "?api=" + encodeURIComponent(API_NAME) +
         "&callback=" + encodeURIComponent(callbackName) +
         "&device_id=" + encodeURIComponent(DEVICE_ID) +
         "&token=" + encodeURIComponent(TOKEN) +
@@ -366,9 +387,9 @@
 
       if (response.success && response.code === "ACCEPTED") {
         vibrateSuccess();
-
+      
         const data = response.data || {};
-
+      
         setStatus(
           "success",
           "Accepted",
@@ -379,7 +400,48 @@
           "\nLunch: " + (data.lunch_allocated || "NO") +
           "\nServer: " + response.server_time
         );
-
+      
+        resetToScanningSoon();
+        return;
+      }
+      
+      if (response.success && response.code === "LUNCH_ENTRY") {
+        vibrateSuccess();
+      
+        const data = response.data || {};
+      
+        setStatus(
+          "success",
+          "Lunch Entry",
+          response.message +
+          "\nID: " + (data.employee_id || "") +
+          "\nDepartment: " + (data.department || "") +
+          "\nEntry: " + (data.lunch_entry_time || "") +
+          "\nStatus: " + (data.lunch_status || "") +
+          "\nServer: " + response.server_time
+        );
+      
+        resetToScanningSoon();
+        return;
+      }
+      
+      if (response.success && response.code === "LUNCH_EXIT") {
+        vibrateSuccess();
+      
+        const data = response.data || {};
+      
+        setStatus(
+          "success",
+          "Lunch Exit",
+          response.message +
+          "\nID: " + (data.employee_id || "") +
+          "\nDepartment: " + (data.department || "") +
+          "\nEntry: " + (data.lunch_entry_time || "") +
+          "\nExit: " + (data.lunch_exit_time || "") +
+          "\nDuration: " + (data.lunch_duration_minutes || 0) + " minutes" +
+          "\nServer: " + response.server_time
+        );
+      
         resetToScanningSoon();
         return;
       }

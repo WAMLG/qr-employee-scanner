@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Gate Attendance Scanner</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --card2: #1f2937;
+      --text: #ffffff;
+      --muted: #cbd5e1;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --blue: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      gap: 12px;
+    }
+
+    .top-card,
+    .scanner-card,
+    .status-card {
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    }
+
+    .top-card {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      padding: 14px;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 0 0 6px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .device-pill {
+      display: inline-flex;
+      margin-top: 10px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.16);
+      color: #bae6fd;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .scanner-card {
+      background: var(--card);
+      padding: 12px;
+    }
+
+    #reader {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 14px;
+      background: #020617;
+    }
+
+    .status-card {
+      background: var(--card2);
+      padding: 16px;
+      text-align: center;
+      min-height: 150px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .status-main {
+      font-size: 24px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    .status-sub {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.45;
+      white-space: pre-line;
+    }
+
+    .status-idle .status-main {
+      color: var(--blue);
+    }
+
+    .status-processing .status-main {
+      color: var(--yellow);
+    }
+
+    .status-success .status-main {
+      color: var(--green);
+    }
+
+    .status-error .status-main {
+      color: var(--red);
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      flex: 1;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 12px;
+      font-size: 16px;
+      font-weight: 800;
+      color: #ffffff;
+      background: #2563eb;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .footer {
+      color: #94a3b8;
+      text-align: center;
+      font-size: 12px;
+      padding-bottom: 8px;
+    }
+
+    @media (min-width: 700px) {
+      .app {
+        max-width: 520px;
+        margin: 0 auto;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="top-card">
+      <h1 class="title">Gate Attendance Scanner</h1>
+      <p class="sub">
+        Scan employee QR cards at the gate. Valid scans will be saved to the attendance system.
+      </p>
+      <div class="device-pill">
+        Device: <span id="deviceLabel" style="margin-left:6px;"></span>
+      </div>
+    </div>
+
+    <div class="scanner-card">
+      <div id="reader"></div>
+    </div>
+
+    <div id="statusCard" class="status-card status-idle">
+      <div id="statusMain" class="status-main">Ready</div>
+      <div id="statusSub" class="status-sub">Tap Start Camera and scan an employee QR.</div>
+    </div>
+
+    <div class="button-row">
+      <button id="startBtn" onclick="startScanner()">Start Camera</button>
+      <button id="stopBtn" class="secondary" onclick="stopScanner()" disabled>Stop</button>
+    </div>
+
+    <div class="footer">
+      QR Employee Attendance System
+      <br>
+      GitHub scanner page + Apps Script backend
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbz0Vbx-a7tijTMiSoRJFveiPfIUZvHULf2Iy5dx7Sq2Zww5iHSpQaLKH69DOntdCinu/exec";
+
+    const urlParams = new URLSearchParams(window.location.search);
+
+    const DEVICE_ID = urlParams.get("device_id") || "";
+    const TOKEN = urlParams.get("token") || "";
+
+    let html5QrCode = null;
+    let scannerRunning = false;
+    let processing = false;
+    let lastLocalCode = "";
+    let lastLocalTime = 0;
+
+    document.getElementById("deviceLabel").innerText = DEVICE_ID || "Missing";
+
+    window.addEventListener("load", function () {
+      if (!BACKEND_URL || BACKEND_URL.includes("PASTE_YOUR")) {
+        setStatus("error", "Backend Missing", "Please set the Apps Script backend URL in index.html.");
+        document.getElementById("startBtn").disabled = true;
+        return;
+      }
+
+      if (!DEVICE_ID || !TOKEN) {
+        setStatus(
+          "error",
+          "Device Info Missing",
+          "Open this page with device_id and token in the URL."
+        );
+        document.getElementById("startBtn").disabled = true;
+        return;
+      }
+
+      setStatus("idle", "Ready", "Tap Start Camera and allow camera permission.");
+    });
+
+    function startScanner() {
+      if (scannerRunning || processing) return;
+
+      if (!window.Html5Qrcode) {
+        setStatus("error", "Scanner Library Error", "QR scanner library did not load. Check internet connection.");
+        return;
+      }
+
+      html5QrCode = new Html5Qrcode("reader");
+
+      const config = {
+        fps: 10,
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const size = Math.floor(minEdge * 0.72);
+          return {
+            width: size,
+            height: size
+          };
+        }
+      };
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        onQrSuccess,
+        function () {}
+      ).then(function () {
+        scannerRunning = true;
+        document.getElementById("startBtn").disabled = true;
+        document.getElementById("stopBtn").disabled = false;
+        setStatus("idle", "Scanning", "Camera is active. Show the employee QR card.");
+      }).catch(function (err) {
+        setStatus(
+          "error",
+          "Camera Error",
+          "Could not start camera.\nAllow camera permission and try again.\n\n" + err
+        );
+      });
+    }
+
+    function stopScanner() {
+      if (!html5QrCode || !scannerRunning) return;
+
+      html5QrCode.stop().then(function () {
+        scannerRunning = false;
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = true;
+        setStatus("idle", "Stopped", "Tap Start Camera to scan again.");
+      }).catch(function () {
+        scannerRunning = false;
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = true;
+        setStatus("idle", "Stopped", "Tap Start Camera to scan again.");
+      });
+    }
+
+    function onQrSuccess(decodedText) {
+      const qrText = String(decodedText || "").trim();
+
+      if (!qrText) return;
+
+      const now = Date.now();
+
+      // Local duplicate protection before sending to server.
+      if (qrText === lastLocalCode && now - lastLocalTime < 3000) {
+        return;
+      }
+
+      if (processing) return;
+
+      lastLocalCode = qrText;
+      lastLocalTime = now;
+      processing = true;
+
+      setStatus("processing", "Processing", "Scanned: " + qrText + "\nSending to server...");
+
+      sendGateScan(qrText);
+    }
+
+    function sendGateScan(qrText) {
+      const callbackName = "qrCallback_" + Date.now();
+
+      const script = document.createElement("script");
+
+      window[callbackName] = function(response) {
+        delete window[callbackName];
+
+        if (script && script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+
+        handleServerResponse(response);
+      };
+
+      const apiUrl =
+        BACKEND_URL +
+        "?api=gateScan" +
+        "&callback=" + encodeURIComponent(callbackName) +
+        "&device_id=" + encodeURIComponent(DEVICE_ID) +
+        "&token=" + encodeURIComponent(TOKEN) +
+        "&qr_payload=" + encodeURIComponent(qrText) +
+        "&client_time=" + encodeURIComponent(new Date().toISOString());
+
+      script.src = apiUrl;
+
+      script.onerror = function() {
+        processing = false;
+        delete window[callbackName];
+        setStatus("error", "Network Error", "Could not contact Apps Script backend.");
+        resetToScanningSoon();
+      };
+
+      document.body.appendChild(script);
+    }
+
+    function handleServerResponse(response) {
+      processing = false;
+
+      if (!response) {
+        setStatus("error", "No Response", "No response received from server.");
+        resetToScanningSoon();
+        return;
+      }
+
+      if (response.success && response.code === "ACCEPTED") {
+        vibrateSuccess();
+
+        const data = response.data || {};
+
+        setStatus(
+          "success",
+          "Accepted",
+          response.message +
+          "\nID: " + (data.employee_id || "") +
+          "\nDepartment: " + (data.department || "") +
+          "\nScans Today: " + (data.scan_count || "") +
+          "\nLunch: " + (data.lunch_allocated || "NO") +
+          "\nServer: " + response.server_time
+        );
+
+        resetToScanningSoon();
+        return;
+      }
+
+      if (response.success && response.code === "DUPLICATE") {
+        vibrateWarning();
+
+        setStatus(
+          "processing",
+          "Duplicate Ignored",
+          response.message + "\nServer: " + response.server_time
+        );
+
+        resetToScanningSoon();
+        return;
+      }
+
+      vibrateError();
+
+      setStatus(
+        "error",
+        "Rejected",
+        response.message + "\nCode: " + response.code + "\nServer: " + response.server_time
+      );
+
+      resetToScanningSoon();
+    }
+
+    function resetToScanningSoon() {
+      setTimeout(function () {
+        setStatus("idle", "Scanning", "Camera is active. Show the next employee QR card.");
+      }, 2200);
+    }
+
+    function setStatus(type, main, sub) {
+      const card = document.getElementById("statusCard");
+      card.className = "status-card status-" + type;
+      document.getElementById("statusMain").innerText = main;
+      document.getElementById("statusSub").innerText = sub || "";
+    }
+
+    function vibrateSuccess() {
+      if (navigator.vibrate) navigator.vibrate([80]);
+    }
+
+    function vibrateWarning() {
+      if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
+    }
+
+    function vibrateError() {
+      if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
+    }
+  </script>
+</body>
+</html>

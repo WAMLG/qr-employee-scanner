@@ -1,9 +1,14 @@
+```html
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>QR Scanner</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+  >
+
+  <title>QR Lunch Scanner</title>
 
   <script src="https://unpkg.com/html5-qrcode"></script>
 
@@ -24,11 +29,17 @@
       box-sizing: border-box;
     }
 
+    html,
     body {
       margin: 0;
+      padding: 0;
+      min-height: 100%;
       background: var(--bg);
       color: var(--text);
       font-family: Arial, sans-serif;
+    }
+
+    body {
       min-height: 100vh;
     }
 
@@ -44,8 +55,8 @@
     .scanner-card,
     .status-card {
       border-radius: 18px;
-      border: 1px solid rgba(255,255,255,0.12);
-      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
     }
 
     .top-card {
@@ -87,6 +98,10 @@
       overflow: hidden;
       border-radius: 14px;
       background: #020617;
+    }
+
+    #reader video {
+      border-radius: 14px;
     }
 
     .status-card {
@@ -172,11 +187,17 @@
 
 <body>
   <div class="app">
+
     <div class="top-card">
-      <h1 id="pageTitle" class="title">QR Scanner</h1>
-      <p id="pageDescription" class="sub"></p>
+      <h1 id="pageTitle" class="title">QR Lunch Scanner</h1>
+
+      <p id="pageDescription" class="sub">
+        Scan the employee QR.
+      </p>
+
       <div class="device-pill">
-        Device: <span id="deviceLabel" style="margin-left:6px;"></span>
+        Device:
+        <span id="deviceLabel" style="margin-left: 6px;"></span>
       </div>
     </div>
 
@@ -186,63 +207,141 @@
 
     <div id="statusCard" class="status-card status-idle">
       <div id="statusMain" class="status-main">Ready</div>
-      <div id="statusSub" class="status-sub">Tap Start Camera and scan an employee QR.</div>
+
+      <div id="statusSub" class="status-sub">
+        Tap Start Camera and scan the employee QR.
+      </div>
     </div>
 
     <div class="button-row">
-      <button id="startBtn" onclick="startScanner()">Start Camera</button>
-      <button id="stopBtn" class="secondary" onclick="stopScanner()" disabled>Stop</button>
+      <button id="startBtn" onclick="startScanner()">
+        Start Camera
+      </button>
+
+      <button
+        id="stopBtn"
+        class="secondary"
+        onclick="stopScanner()"
+        disabled
+      >
+        Stop
+      </button>
     </div>
 
     <div class="footer">
-      QR Employee Attendance System
+      QR Lunch Management System
       <br>
-      GitHub scanner page + Apps Script backend
+      Server time shown after each scan
     </div>
+
   </div>
 
   <script>
-    const BACKEND_URL = "https://script.google.com/macros/s/AKfycbz0Vbx-a7tijTMiSoRJFveiPfIUZvHULf2Iy5dx7Sq2Zww5iHSpQaLKH69DOntdCinu/exec";
+    /*
+     * Apps Script backend deployment URL.
+     */
+    const BACKEND_URL =
+      "https://script.google.com/macros/s/AKfycbz0Vbx-a7tijTMiSoRJFveiPfIUZvHULf2Iy5dx7Sq2Zww5iHSpQaLKH69DOntdCinu/exec";
 
+    /*
+     * URL settings.
+     *
+     * mode=request → lunch request scanner
+     * mode=lunch   → lunch room scanner
+     */
     const urlParams = new URLSearchParams(window.location.search);
-    
-    const MODE = (urlParams.get("mode") || "gate").toLowerCase();
-    const DEVICE_ID = urlParams.get("device_id") || "";
-    const TOKEN = urlParams.get("token") || "";
-    
-    const API_NAME = MODE === "lunch" ? "lunchScan" : "gateScan";
-    
+
+    const requestedMode =
+      (urlParams.get("mode") || "request").toLowerCase();
+
+    const MODE =
+      requestedMode === "lunch"
+        ? "lunch"
+        : "request";
+
+    const DEVICE_ID =
+      urlParams.get("device_id") || "";
+
+    const TOKEN =
+      urlParams.get("token") || "";
+
+    /*
+     * Apps Script API route used by each scanner mode.
+     */
+    const API_NAME =
+      MODE === "lunch"
+        ? "lunchScan"
+        : "lunchRequest";
+
+    /*
+     * Text displayed for each scanner.
+     */
     const PAGE_CONFIG = {
-      gate: {
-        title: "Gate Attendance Scanner",
-        description: "Scan employee QR cards at the gate. Valid scans will be saved to the attendance system.",
-        readyText: "Tap Start Camera and scan an employee QR.",
-        scanningText: "Camera is active. Show the employee QR card."
+      request: {
+        title: "Lunch Request Scanner",
+
+        description:
+          "Scan the employee QR before 10:00 AM to request company lunch for today.",
+
+        readyText:
+          "Tap Start Camera and scan the employee QR.",
+
+        scanningText:
+          "Camera is active. Scan the next lunch request."
       },
+
       lunch: {
         title: "Lunch Room Scanner",
-        description: "Scan employee QR cards at the lunch room. The system will record lunch entry and exit.",
-        readyText: "Tap Start Camera and scan an employee QR.",
-        scanningText: "Camera is active. Show the employee QR card for lunch entry or exit."
+
+        description:
+          "Scan employee QR cards when entering and leaving the lunch room.",
+
+        readyText:
+          "Tap Start Camera and scan the employee QR.",
+
+        scanningText:
+          "Camera is active. Scan for lunch room IN or OUT."
       }
     };
-    
-    const CURRENT_PAGE = PAGE_CONFIG[MODE] || PAGE_CONFIG.gate;
+
+    const CURRENT_PAGE =
+      PAGE_CONFIG[MODE] || PAGE_CONFIG.request;
 
     let html5QrCode = null;
     let scannerRunning = false;
     let processing = false;
+
     let lastLocalCode = "";
     let lastLocalTime = 0;
 
-    document.getElementById("deviceLabel").innerText = DEVICE_ID || "Missing";
-    document.getElementById("pageTitle").innerText = CURRENT_PAGE.title;
-    document.getElementById("pageDescription").innerText = CURRENT_PAGE.description;
+    /*
+     * Set page details.
+     */
+    document.getElementById("deviceLabel").innerText =
+      DEVICE_ID || "Missing";
+
+    document.getElementById("pageTitle").innerText =
+      CURRENT_PAGE.title;
+
+    document.getElementById("pageDescription").innerText =
+      CURRENT_PAGE.description;
+
     document.title = CURRENT_PAGE.title;
 
+    /*
+     * Initial page validation.
+     */
     window.addEventListener("load", function () {
-      if (!BACKEND_URL || BACKEND_URL.includes("PASTE_YOUR")) {
-        setStatus("error", "Backend Missing", "Please set the Apps Script backend URL in index.html.");
+      if (
+        !BACKEND_URL ||
+        BACKEND_URL.includes("PASTE_YOUR")
+      ) {
+        setStatus(
+          "error",
+          "Backend Missing",
+          "Please set the Apps Script backend URL in index.html."
+        );
+
         document.getElementById("startBtn").disabled = true;
         return;
       }
@@ -253,18 +352,31 @@
           "Device Info Missing",
           "Open this page with device_id and token in the URL."
         );
+
         document.getElementById("startBtn").disabled = true;
         return;
       }
 
-      setStatus("idle", "Ready", CURRENT_PAGE.readyText);
+      setStatus(
+        "idle",
+        "Ready",
+        CURRENT_PAGE.readyText
+      );
     });
 
+    /*
+     * Start the camera scanner.
+     */
     function startScanner() {
       if (scannerRunning || processing) return;
 
       if (!window.Html5Qrcode) {
-        setStatus("error", "Scanner Library Error", "QR scanner library did not load. Check internet connection.");
+        setStatus(
+          "error",
+          "Scanner Library Error",
+          "QR scanner library did not load. Check the internet connection."
+        );
+
         return;
       }
 
@@ -272,60 +384,120 @@
 
       const config = {
         fps: 10,
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+
+        qrbox: function (
+          viewfinderWidth,
+          viewfinderHeight
+        ) {
+          const minEdge = Math.min(
+            viewfinderWidth,
+            viewfinderHeight
+          );
+
           const size = Math.floor(minEdge * 0.72);
+
           return {
             width: size,
             height: size
           };
-        }
+        },
+
+        aspectRatio: 1.0
       };
 
       html5QrCode.start(
-        { facingMode: "environment" },
+        {
+          facingMode: "environment"
+        },
+
         config,
+
         onQrSuccess,
-        function () {}
+
+        function () {
+          // Ignore frequent frame-level scan errors.
+        }
+
       ).then(function () {
         scannerRunning = true;
+
         document.getElementById("startBtn").disabled = true;
         document.getElementById("stopBtn").disabled = false;
-        setStatus("idle", "Scanning", CURRENT_PAGE.scanningText);
-      }).catch(function (err) {
+
+        setStatus(
+          "idle",
+          "Scanning",
+          CURRENT_PAGE.scanningText
+        );
+
+      }).catch(function (error) {
+        scannerRunning = false;
+
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = true;
+
         setStatus(
           "error",
           "Camera Error",
-          "Could not start camera.\nAllow camera permission and try again.\n\n" + err
+          "Could not start camera.\n" +
+          "Allow camera permission and try again.\n\n" +
+          String(error)
         );
       });
     }
 
+    /*
+     * Stop the camera scanner.
+     */
     function stopScanner() {
       if (!html5QrCode || !scannerRunning) return;
 
-      html5QrCode.stop().then(function () {
-        scannerRunning = false;
-        document.getElementById("startBtn").disabled = false;
-        document.getElementById("stopBtn").disabled = true;
-        setStatus("idle", "Stopped", "Tap Start Camera to scan again.");
-      }).catch(function () {
-        scannerRunning = false;
-        document.getElementById("startBtn").disabled = false;
-        document.getElementById("stopBtn").disabled = true;
-        setStatus("idle", "Stopped", "Tap Start Camera to scan again.");
-      });
+      html5QrCode.stop()
+        .then(function () {
+          scannerRunning = false;
+
+          document.getElementById("startBtn").disabled = false;
+          document.getElementById("stopBtn").disabled = true;
+
+          setStatus(
+            "idle",
+            "Stopped",
+            "Tap Start Camera to scan again."
+          );
+        })
+        .catch(function () {
+          scannerRunning = false;
+
+          document.getElementById("startBtn").disabled = false;
+          document.getElementById("stopBtn").disabled = true;
+
+          setStatus(
+            "idle",
+            "Stopped",
+            "Tap Start Camera to scan again."
+          );
+        });
     }
 
+    /*
+     * Called when a QR code is detected.
+     */
     function onQrSuccess(decodedText) {
-      const qrText = String(decodedText || "").trim();
+      const qrText =
+        String(decodedText || "").trim();
 
       if (!qrText) return;
 
       const now = Date.now();
 
-      // Local duplicate protection before sending to server.
-      if (qrText === lastLocalCode && now - lastLocalTime < 3000) {
+      /*
+       * Local duplicate protection.
+       * Server-side duplicate protection still applies.
+       */
+      if (
+        qrText === lastLocalCode &&
+        now - lastLocalTime < 3000
+      ) {
         return;
       }
 
@@ -335,20 +507,61 @@
       lastLocalTime = now;
       processing = true;
 
-      setStatus("processing", "Processing", "Scanned: " + qrText + "\nSending to server...");
+      setStatus(
+        "processing",
+        "Processing",
+        "Scanned: " + qrText +
+        "\nSending to server..."
+      );
 
-      sendGateScan(qrText);
+      sendScan(qrText);
     }
 
-    function sendGateScan(qrText) {
-      const callbackName = "qrCallback_" + Date.now();
+    /*
+     * Send the scanned employee ID to Apps Script using JSONP.
+     */
+    function sendScan(qrText) {
+      const callbackName =
+        "qrCallback_" +
+        Date.now() +
+        "_" +
+        Math.floor(Math.random() * 100000);
 
-      const script = document.createElement("script");
+      const script =
+        document.createElement("script");
 
-      window[callbackName] = function(response) {
+      let requestCompleted = false;
+
+      const timeoutId = setTimeout(function () {
+        if (requestCompleted) return;
+
+        requestCompleted = true;
+        processing = false;
+
         delete window[callbackName];
 
-        if (script && script.parentNode) {
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+
+        setStatus(
+          "error",
+          "Network Timeout",
+          "The server did not respond. Check the connection and try again."
+        );
+
+        resetToScanningSoon();
+      }, 15000);
+
+      window[callbackName] = function (response) {
+        if (requestCompleted) return;
+
+        requestCompleted = true;
+        clearTimeout(timeoutId);
+
+        delete window[callbackName];
+
+        if (script.parentNode) {
           script.parentNode.removeChild(script);
         }
 
@@ -362,138 +575,354 @@
         "&device_id=" + encodeURIComponent(DEVICE_ID) +
         "&token=" + encodeURIComponent(TOKEN) +
         "&qr_payload=" + encodeURIComponent(qrText) +
-        "&client_time=" + encodeURIComponent(new Date().toISOString());
+        "&client_time=" +
+          encodeURIComponent(new Date().toISOString());
 
       script.src = apiUrl;
 
-      script.onerror = function() {
+      script.onerror = function () {
+        if (requestCompleted) return;
+
+        requestCompleted = true;
+        clearTimeout(timeoutId);
         processing = false;
+
         delete window[callbackName];
-        setStatus("error", "Network Error", "Could not contact Apps Script backend.");
+
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+
+        setStatus(
+          "error",
+          "Network Error",
+          "Could not contact the Apps Script backend."
+        );
+
         resetToScanningSoon();
       };
 
       document.body.appendChild(script);
     }
 
+    /*
+     * Handle Apps Script response.
+     */
     function handleServerResponse(response) {
       processing = false;
 
       if (!response) {
-        setStatus("error", "No Response", "No response received from server.");
+        setStatus(
+          "error",
+          "No Response",
+          "No response was received from the server."
+        );
+
         resetToScanningSoon();
         return;
       }
 
-      if (response.success && response.code === "ACCEPTED") {
+      /*
+       * New lunch request accepted.
+       */
+      if (
+        response.success &&
+        response.code === "REQUEST_ACCEPTED"
+      ) {
         vibrateSuccess();
-      
+
         const data = response.data || {};
-      
+
+        const categoryTitle =
+          data.category === "REGULAR"
+            ? "Regular Lunch Requested"
+            : "Extra Lunch Requested";
+
         setStatus(
           "success",
-          "Accepted",
+          categoryTitle,
+
           response.message +
-          "\nID: " + (data.employee_id || "") +
-          "\nDepartment: " + (data.department || "") +
-          "\nScans Today: " + (data.scan_count || "") +
-          "\nLunch: " + (data.lunch_allocated || "NO") +
-          "\nServer: " + response.server_time
+
+          "\nID: " +
+          (data.employee_id || "") +
+
+          "\nDepartment: " +
+          (data.department || "") +
+
+          "\nCategory: " +
+          (data.category || "") +
+
+          "\nRequest Time: " +
+          (data.request_time || "") +
+
+          "\nRegular Orders: " +
+          (data.regular_orders || 0) +
+
+          "\nExtra Orders: " +
+          (data.extra_orders || 0) +
+
+          "\nMonthly Non-Requests: " +
+          (data.monthly_non_requests || 0) +
+
+          "\nFinal Lunch Count: " +
+          (data.final_lunch_count || 0) +
+
+          "\nServer: " +
+          response.server_time
         );
-      
-        resetToScanningSoon();
-        return;
-      }
-      
-      if (response.success && response.code === "LUNCH_ENTRY") {
-        vibrateSuccess();
-      
-        const data = response.data || {};
-      
-        setStatus(
-          "success",
-          "Lunch Entry",
-          response.message +
-          "\nID: " + (data.employee_id || "") +
-          "\nDepartment: " + (data.department || "") +
-          "\nEntry: " + (data.lunch_entry_time || "") +
-          "\nStatus: " + (data.lunch_status || "") +
-          "\nServer: " + response.server_time
-        );
-      
-        resetToScanningSoon();
-        return;
-      }
-      
-      if (response.success && response.code === "LUNCH_EXIT") {
-        vibrateSuccess();
-      
-        const data = response.data || {};
-      
-        setStatus(
-          "success",
-          "Lunch Exit",
-          response.message +
-          "\nID: " + (data.employee_id || "") +
-          "\nDepartment: " + (data.department || "") +
-          "\nEntry: " + (data.lunch_entry_time || "") +
-          "\nExit: " + (data.lunch_exit_time || "") +
-          "\nDuration: " + (data.lunch_duration_minutes || 0) + " minutes" +
-          "\nServer: " + response.server_time
-        );
-      
+
         resetToScanningSoon();
         return;
       }
 
-      if (response.success && response.code === "DUPLICATE") {
+      /*
+       * Employee already requested lunch today.
+       */
+      if (
+        response.success &&
+        response.code === "ALREADY_REQUESTED"
+      ) {
+        vibrateWarning();
+
+        const data = response.data || {};
+
+        setStatus(
+          "processing",
+          "Already Requested",
+
+          response.message +
+
+          "\nID: " +
+          (data.employee_id || "") +
+
+          "\nCategory: " +
+          (data.category || "") +
+
+          "\nRegular Orders: " +
+          (data.regular_orders || 0) +
+
+          "\nExtra Orders: " +
+          (data.extra_orders || 0) +
+
+          "\nFinal Lunch Count: " +
+          (data.final_lunch_count || 0) +
+
+          "\nServer: " +
+          response.server_time
+        );
+
+        resetToScanningSoon();
+        return;
+      }
+
+      /*
+       * Lunch-room entry accepted.
+       */
+      if (
+        response.success &&
+        response.code === "LUNCH_ENTRY"
+      ) {
+        vibrateSuccess();
+
+        const data = response.data || {};
+
+        setStatus(
+          "success",
+          "Lunch Room IN",
+
+          response.message +
+
+          "\nID: " +
+          (data.employee_id || "") +
+
+          "\nDepartment: " +
+          (data.department || "") +
+
+          "\nEntry: " +
+          (data.lunch_entry_time || "") +
+
+          "\nRequest: " +
+          (data.request_status || "NOT_REQUESTED") +
+
+          "\nCategory: " +
+          (data.request_category || "NONE") +
+
+          "\nServer: " +
+          response.server_time
+        );
+
+        resetToScanningSoon();
+        return;
+      }
+
+      /*
+       * Lunch-room exit accepted.
+       */
+      if (
+        response.success &&
+        response.code === "LUNCH_EXIT"
+      ) {
+        vibrateSuccess();
+
+        const data = response.data || {};
+
+        setStatus(
+          "success",
+          "Lunch Room OUT",
+
+          response.message +
+
+          "\nID: " +
+          (data.employee_id || "") +
+
+          "\nDepartment: " +
+          (data.department || "") +
+
+          "\nEntry: " +
+          (data.lunch_entry_time || "") +
+
+          "\nExit: " +
+          (data.lunch_exit_time || "") +
+
+          "\nDuration: " +
+          (data.lunch_duration_minutes || 0) +
+          " minutes" +
+
+          "\nServer: " +
+          response.server_time
+        );
+
+        resetToScanningSoon();
+        return;
+      }
+
+      /*
+       * Duplicate lunch-room scan.
+       */
+      if (
+        response.success &&
+        response.code === "DUPLICATE"
+      ) {
         vibrateWarning();
 
         setStatus(
           "processing",
           "Duplicate Ignored",
-          response.message + "\nServer: " + response.server_time
+
+          response.message +
+
+          "\nServer: " +
+          response.server_time
         );
 
         resetToScanningSoon();
         return;
       }
 
+      /*
+       * Generic successful response fallback.
+       */
+      if (response.success) {
+        vibrateSuccess();
+
+        setStatus(
+          "success",
+          "Completed",
+
+          response.message +
+
+          "\nServer: " +
+          response.server_time
+        );
+
+        resetToScanningSoon();
+        return;
+      }
+
+      /*
+       * Rejected request or system error.
+       */
       vibrateError();
+
+      let rejectionTitle = "Rejected";
+
+      if (response.code === "REQUEST_CLOSED") {
+        rejectionTitle = "Request Time Closed";
+      } else if (
+        response.code === "LUNCH_ALREADY_COMPLETED"
+      ) {
+        rejectionTitle = "Already Completed";
+      } else if (
+        response.code === "EMPLOYEE_NOT_FOUND"
+      ) {
+        rejectionTitle = "Employee Not Found";
+      }
 
       setStatus(
         "error",
-        "Rejected",
-        response.message + "\nCode: " + response.code + "\nServer: " + response.server_time
+        rejectionTitle,
+
+        response.message +
+
+        "\nCode: " +
+        (response.code || "UNKNOWN_ERROR") +
+
+        "\nServer: " +
+        (response.server_time || "")
       );
 
       resetToScanningSoon();
     }
 
+    /*
+     * Return to scanning message after showing a result.
+     */
     function resetToScanningSoon() {
       setTimeout(function () {
-        setStatus("idle", "Scanning", "Camera is active. Show the next employee QR card.");
+        setStatus(
+          "idle",
+          "Scanning",
+          CURRENT_PAGE.scanningText
+        );
       }, 2200);
     }
 
+    /*
+     * Update the status card.
+     */
     function setStatus(type, main, sub) {
-      const card = document.getElementById("statusCard");
-      card.className = "status-card status-" + type;
-      document.getElementById("statusMain").innerText = main;
-      document.getElementById("statusSub").innerText = sub || "";
+      const card =
+        document.getElementById("statusCard");
+
+      card.className =
+        "status-card status-" + type;
+
+      document.getElementById("statusMain").innerText =
+        main;
+
+      document.getElementById("statusSub").innerText =
+        sub || "";
     }
 
     function vibrateSuccess() {
-      if (navigator.vibrate) navigator.vibrate([80]);
+      if (navigator.vibrate) {
+        navigator.vibrate([80]);
+      }
     }
 
     function vibrateWarning() {
-      if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
+      if (navigator.vibrate) {
+        navigator.vibrate([80, 60, 80]);
+      }
     }
 
     function vibrateError() {
-      if (navigator.vibrate) navigator.vibrate([180, 80, 180]);
+      if (navigator.vibrate) {
+        navigator.vibrate([180, 80, 180]);
+      }
     }
   </script>
 </body>
 </html>
+```

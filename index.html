@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Lunch QR · Scanner V6</title>
+<title>Lunch QR · Scanner V7</title>
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#0b1421;color:#f6f9ff}*{box-sizing:border-box}body{max-width:760px;margin:0 auto;padding:14px 14px 38px}header{display:flex;align-items:center;justify-content:space-between;gap:10px}h1{font-size:1.25rem;margin:8px 0 2px}small,.muted{color:#b8c8dc}.pill{border:1px solid #66788e;padding:6px 10px;border-radius:25px;font-size:.78rem;white-space:nowrap}section{background:#17273b;border:1px solid #30445e;border-radius:16px;padding:13px;margin-top:13px}.view{position:relative;overflow:hidden;background:#02060b;border-radius:13px;aspect-ratio:3/4;max-height:65vh;display:grid;place-items:center}.view video{width:100%;height:100%;object-fit:contain;background:#02060b}.view .guide{position:absolute;width:64%;aspect-ratio:1;border:2px solid rgba(98,239,176,.8);border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,.08);pointer-events:none}.view .guide:after{content:'Aim at the QR · can scan outside box';position:absolute;bottom:-29px;left:-25%;width:150%;text-align:center;font-size:.72rem;color:#e1f3ea;text-shadow:0 1px 4px #000}.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.controls button{flex:1}button,select{font:inherit;border:1px solid #627b96;background:#263e59;color:white;border-radius:10px;min-height:44px;padding:10px}button.primary{background:#13764e;border-color:#35b47a}button:disabled{opacity:.42}label{display:block;margin:10px 0 6px}select{width:100%}#result{padding:14px;border-radius:12px;background:#263b54;min-height:60px;text-align:center;display:grid;place-items:center;font-weight:650;overflow-wrap:anywhere}#result.ok{background:#0d5537}#result.warn{background:#65471c}#result.err{background:#652a30}#diag{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.82rem;line-height:1.45}#log{list-style:none;margin:8px 0;padding:0;max-height:240px;overflow:auto}#log li{border-bottom:1px solid #31455e;padding:9px 0}input[type=range]{width:100%}.help{line-height:1.5;font-size:.88rem}h2{font-size:1.05rem;margin:0 0 8px}
 /* Scan confirmation: brief green frame and checkmark; detection only, not backend registration. */
@@ -14,6 +14,12 @@
 .view.scan-success .scan-confirm{opacity:1}
 .view.scan-duplicate{box-shadow:0 0 0 5px #ffbe46,0 0 24px #ffbe4666}.view.scan-duplicate .guide{border:5px solid #ffbe46}.view.scan-error{box-shadow:0 0 0 5px #ff6675,0 0 24px #ff667566}.view.scan-error .guide{border:5px solid #ff6675}
 @media(prefers-reduced-motion:reduce){.view,.scan-confirm{transition:none}}
+/* Animated indeterminate progress, not a fabricated percentage. */
+#loadingTrack{height:5px;background:#263b54;border-radius:20px;overflow:hidden;margin-top:10px;display:none}
+#loadingTrack.active{display:block}
+#loadingTrack:before{content:"";display:block;width:38%;height:100%;background:#62efb0;border-radius:20px;animation:loadmove 1.05s ease-in-out infinite alternate}
+@keyframes loadmove{from{transform:translateX(-100%)}to{transform:translateX(265%)}}
+@media(prefers-reduced-motion:reduce){#loadingTrack:before{animation:none;width:100%}}
 </style>
 </head>
 <body>
@@ -26,7 +32,7 @@
 <p class="help muted">For 1.5–2 cm QR codes: hold the card steady, use good lighting, and start around 15–30 cm away. Move closer if the code is too small or blurred. The whole video frame is scanned, not only the green square.</p>
 <p id="diag" class="muted" aria-live="polite"></p>
 </section>
-<section><div id="result" role="status" aria-live="polite">Ready to scan</div><p class="muted" id="count">Registered: 0</p></section>
+<section><div id="result" role="status" aria-live="polite">Ready to scan</div><div id="loadingTrack" role="progressbar" aria-label="Checking lunch order" aria-valuetext="Waiting for server confirmation"></div><p class="muted" id="count">Registered: 0</p></section>
 <section><h2>Recent scan results</h2><ul id="log"></ul><button id="clear">Clear history</button></section>
 <canvas id="canvas" hidden></canvas>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -74,14 +80,14 @@ function postLunch(id){return new Promise((resolve,reject)=>{
 async function onCode(raw){
  const id=String(raw??'').trim();if(!id||pending)return;
  const now=Date.now();if((recent.get(id)||0)>now)return;
- recent.set(id,now+8000);pending=true;result('Checking lunch request for '+id+'…');
+ recent.set(id,now+8000);pending=true;el('loadingTrack').classList.add('active');result('Checking lunch request for '+id+'…');
  try{const r=await postLunch(id);const code=r?.code||'UNKNOWN';
    if(r?.success&&code==='REQUEST_CREATED'){count++;el('count').textContent='Registered: '+count;result('✓ '+(r.employee_name||id)+' — '+(r.request_type||'Lunch')+' registered','ok');feedback('scan-success');playTone();if(navigator.vibrate)navigator.vibrate(65)}
    else if(code==='ALREADY_PROCESSED'){result('Already requested today: '+(r.employee||id),'warn');feedback('scan-duplicate')}
    else{result((r?.message||'Request not accepted')+' ('+id+')','err');feedback('scan-error')}
    logResult(id,r?.message||code)
  }catch(e){result('Not confirmed: '+e.message,'err');feedback('scan-error');logResult(id,'NOT CONFIRMED — '+e.message)}
- finally{pending=false;const t=Date.now();for(const [k,v] of recent)if(v<t)recent.delete(k)}
+ finally{pending=false;el('loadingTrack').classList.remove('active');const t=Date.now();for(const [k,v] of recent)if(v<t)recent.delete(k)}
 }
 
 async function listCameras(){if(!navigator.mediaDevices?.enumerateDevices)return;try{const all=await navigator.mediaDevices.enumerateDevices(),cameras=all.filter(d=>d.kind==='videoinput'),select=el('camera'),old=select.value;select.replaceChildren(new Option('Automatic rear camera (recommended)',''));for(const d of cameras)select.add(new Option(d.label||'Camera '+select.length,d.deviceId));if([...select.options].some(o=>o.value===old))select.value=old}catch(e){diagnostic('Camera enumeration: '+errorText(e))}}

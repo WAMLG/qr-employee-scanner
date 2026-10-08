@@ -12,11 +12,12 @@
 .scan-confirm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .12s ease;background:rgba(0,40,25,.18)}
 .scan-confirm span{display:grid;place-items:center;width:100px;height:100px;border-radius:50%;background:#0b8755;border:4px solid #9fffd0;color:#fff;font-size:66px;font-weight:800;box-shadow:0 8px 32px #0008}
 .view.scan-success .scan-confirm{opacity:1}
+.view.scan-duplicate{box-shadow:0 0 0 5px #ffbe46,0 0 24px #ffbe4666}.view.scan-duplicate .guide{border:5px solid #ffbe46}.view.scan-error{box-shadow:0 0 0 5px #ff6675,0 0 24px #ff667566}.view.scan-error .guide{border:5px solid #ff6675}
 @media(prefers-reduced-motion:reduce){.view,.scan-confirm{transition:none}}
 </style>
 </head>
 <body>
-<header><div><h1>Lunch QR Scanner</h1><small>Precision camera test · no requests sent</small></div><span class="pill" id="state">Stopped</span></header>
+<header><div><h1>Lunch QR Scanner</h1><small>Live lunch registration · company scanner</small></div><span class="pill" id="state">Stopped</span></header>
 <section>
 <div class="view" id="cameraView"><video id="video" autoplay muted playsinline webkit-playsinline></video><div class="guide"></div><div class="scan-confirm" aria-hidden="true"><span>✓</span></div></div>
 <label for="camera">Camera</label><select id="camera"><option value="">Automatic rear camera (recommended)</option></select>
@@ -25,8 +26,8 @@
 <p class="help muted">For 1.5–2 cm QR codes: hold the card steady, use good lighting, and start around 15–30 cm away. Move closer if the code is too small or blurred. The whole video frame is scanned, not only the green square.</p>
 <p id="diag" class="muted" aria-live="polite"></p>
 </section>
-<section><div id="result" role="status" aria-live="polite">Ready for camera test</div><p class="muted" id="count">Detections: 0</p></section>
-<section><h2>Recent decoded IDs</h2><ul id="log"></ul><button id="clear">Clear history</button></section>
+<section><div id="result" role="status" aria-live="polite">Configure endpoint below, then start scanning</div><p class="muted" id="count">Registered: 0</p></section>
+<section><h2>Connection settings</h2><label for="endpoint">Apps Script Web App /exec URL</label><input id="endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;min-height:44px;background:#263e59;color:white;border:1px solid #627b96;border-radius:10px;padding:10px"><label for="deviceId">Approved device ID</label><input id="deviceId" value="TEST_DEVICE" style="width:100%;min-height:44px;background:#263e59;color:white;border:1px solid #627b96;border-radius:10px;padding:10px"><button id="saveSettings">Save connection settings</button><p class="muted help">The URL and device ID are saved on this phone only. Device IDs are identifiers, not strong authentication.</p></section><section><h2>Recent scan results</h2><ul id="log"></ul><button id="clear">Clear history</button></section>
 <canvas id="canvas" hidden></canvas>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
@@ -41,7 +42,49 @@ function diagnostic(s){el('diag').textContent=s}
 function errorText(e){return e?.message||String(e)}
 function playTone(){try{if(!audio){const C=window.AudioContext||window.webkitAudioContext;if(!C)return;audio=new C()}if(audio.state==='suspended')audio.resume().catch(()=>{});const osc=audio.createOscillator(),gain=audio.createGain();osc.frequency.value=880;gain.gain.value=.045;osc.connect(gain);gain.connect(audio.destination);osc.start();osc.stop(audio.currentTime+.09)}catch(_){}}
 function flashSuccess(){const view=el('cameraView');clearTimeout(flashTimer);view.classList.remove('scan-success');void view.offsetWidth;view.classList.add('scan-success');flashTimer=setTimeout(()=>{view.classList.remove('scan-success');flashTimer=null},850)}
-function onCode(raw){const id=String(raw??'').trim();if(!id)return;const now=Date.now();if(id===lastId&&now-lastIdAt<5000)return;lastId=id;lastIdAt=now;count++;el('count').textContent='Detections: '+count;result('QR detected: '+id,'ok');flashSuccess();playTone();if(navigator.vibrate)try{navigator.vibrate(65)}catch(_){}const li=document.createElement('li');li.textContent=new Date().toLocaleTimeString()+' — '+id;el('log').prepend(li);while(el('log').children.length>20)el('log').lastChild.remove()}
+// Cross-origin form POST into a hidden iframe. Apps Script replies with postMessage.
+// No fetch() / CORS preflight is needed; responses are matched to a random nonce.
+let pending=false, recent=new Map(), pendingTimer=null, frame=null;
+const deviceInput=el('deviceId'), endpointInput=el('endpoint');
+endpointInput.value=localStorage.getItem('lunchEndpoint')||'';
+deviceInput.value=localStorage.getItem('lunchDevice')||'TEST_DEVICE';
+el('saveSettings').onclick=()=>{localStorage.setItem('lunchEndpoint',endpointInput.value.trim());localStorage.setItem('lunchDevice',deviceInput.value.trim());result('Connection settings saved');};
+function feedback(kind){const v=el('cameraView');v.classList.remove('scan-success','scan-duplicate','scan-error');void v.offsetWidth;v.classList.add(kind);clearTimeout(flashTimer);flashTimer=setTimeout(()=>v.classList.remove(kind),1100)}
+function logResult(id, message){const li=document.createElement('li');li.textContent=new Date().toLocaleTimeString()+' — '+id+' — '+message;el('log').prepend(li);while(el('log').children.length>20)el('log').lastChild.remove()}
+function postLunch(id){return new Promise((resolve,reject)=>{
+  const endpoint=endpointInput.value.trim(),device=deviceInput.value.trim();
+  if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/.test(endpoint))return reject(Error('Enter the deployed Apps Script /exec URL'));
+  if(!device)return reject(Error('Enter an approved device ID'));
+  const nonce=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
+  const iframe=document.createElement('iframe');iframe.name='lunch_reply_'+Date.now();iframe.style.display='none';document.body.appendChild(iframe);frame=iframe;
+  const form=document.createElement('form');form.method='POST';form.action=endpoint;form.target=iframe.name;form.style.display='none';
+  for(const [k,v] of Object.entries({employee_id:id,device_id:device,nonce:nonce,origin:location.origin})){
+    const input=document.createElement('input');input.name=k;input.value=v;form.appendChild(input)
+  }
+  document.body.appendChild(form);
+  let settled=false;
+  const finish=(err,data)=>{if(settled)return;settled=true;clearTimeout(pendingTimer);window.removeEventListener('message',handler);form.remove();setTimeout(()=>iframe.remove(),500);frame=null;err?reject(err):resolve(data)};
+  const handler=e=>{if(e.source!==iframe.contentWindow)return;if(!e.data||e.data.type!=='LUNCH_RESULT'||e.data.nonce!==nonce)return;
+    // Apps Script HtmlService iframe responses normally originate from googleusercontent.com.
+    if(!/^https:\/\/([a-z0-9-]+\.)*googleusercontent\.com$/.test(e.origin) && !/^https:\/\/script\.google\.com$/.test(e.origin))return;
+    finish(null,e.data.result)};
+  window.addEventListener('message',handler);
+  pendingTimer=setTimeout(()=>finish(Error('No confirmation received. Check the daily sheet before retrying.')),15000);
+  try{form.submit()}catch(e){finish(e)}
+ })}
+async function onCode(raw){
+ const id=String(raw??'').trim();if(!id||pending)return;
+ const now=Date.now();if((recent.get(id)||0)>now)return;
+ recent.set(id,now+8000);pending=true;result('Checking lunch request for '+id+'…');
+ try{const r=await postLunch(id);const code=r?.code||'UNKNOWN';
+   if(r?.success&&code==='REQUEST_CREATED'){count++;el('count').textContent='Registered: '+count;result('✓ '+(r.employee_name||id)+' — '+(r.request_type||'Lunch')+' registered','ok');feedback('scan-success');playTone();if(navigator.vibrate)navigator.vibrate(65)}
+   else if(code==='ALREADY_PROCESSED'){result('Already requested today: '+(r.employee||id),'warn');feedback('scan-duplicate')}
+   else{result((r?.message||'Request not accepted')+' ('+id+')','err');feedback('scan-error')}
+   logResult(id,r?.message||code)
+ }catch(e){result('Not confirmed: '+e.message,'err');feedback('scan-error');logResult(id,'NOT CONFIRMED — '+e.message)}
+ finally{pending=false;const t=Date.now();for(const [k,v] of recent)if(v<t)recent.delete(k)}
+}
+
 async function listCameras(){if(!navigator.mediaDevices?.enumerateDevices)return;try{const all=await navigator.mediaDevices.enumerateDevices(),cameras=all.filter(d=>d.kind==='videoinput'),select=el('camera'),old=select.value;select.replaceChildren(new Option('Automatic rear camera (recommended)',''));for(const d of cameras)select.add(new Option(d.label||'Camera '+select.length,d.deviceId));if([...select.options].some(o=>o.value===old))select.value=old}catch(e){diagnostic('Camera enumeration: '+errorText(e))}}
 function release(){clearTimeout(flashTimer);flashTimer=null;el('cameraView').classList.remove('scan-success');active=false;cancelAnimationFrame(raf);raf=0;const old=stream;stream=null;track=null;torchOn=false;el('torch').disabled=true;el('torch').textContent='Flashlight';el('zoomWrap').hidden=true;video.pause();video.srcObject=null;if(old)old.getTracks().forEach(t=>t.stop());}
 async function stop(){token++;release();state('Stopped');result('Camera stopped');el('start').disabled=false;el('stop').disabled=true}
@@ -82,6 +125,6 @@ el('start').addEventListener('click',start);el('stop').addEventListener('click',
 el('camera').addEventListener('change',async()=>{if(opening)return;if(active){await stop();await start()}});
 el('torch').addEventListener('click',async()=>{if(!track)return;try{torchOn=!torchOn;await track.applyConstraints({advanced:[{torch:torchOn}]});el('torch').textContent=torchOn?'Flashlight off':'Flashlight'}catch(e){torchOn=false;result('Flashlight unavailable on this camera','warn')}});
 el('zoom').addEventListener('change',async()=>{if(!track)return;try{const value=Number(el('zoom').value);await track.applyConstraints({advanced:[{zoom:value}]});el('zoomLabel').textContent=String(value)}catch(e){result('Zoom control unavailable','warn')}});
-el('clear').addEventListener('click',()=>{el('log').replaceChildren();count=0;el('count').textContent='Detections: 0';result('History cleared')});
+el('clear').addEventListener('click',()=>{el('log').replaceChildren();count=0;el('count').textContent='Registered: 0';result('History cleared')});
 window.addEventListener('pagehide',()=>{token++;release()});listCameras();
 </script></body></html>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Lunch QR · Precision Scanner</title>
+<title>Lunch QR · Scanner V6</title>
 <style>
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#0b1421;color:#f6f9ff}*{box-sizing:border-box}body{max-width:760px;margin:0 auto;padding:14px 14px 38px}header{display:flex;align-items:center;justify-content:space-between;gap:10px}h1{font-size:1.25rem;margin:8px 0 2px}small,.muted{color:#b8c8dc}.pill{border:1px solid #66788e;padding:6px 10px;border-radius:25px;font-size:.78rem;white-space:nowrap}section{background:#17273b;border:1px solid #30445e;border-radius:16px;padding:13px;margin-top:13px}.view{position:relative;overflow:hidden;background:#02060b;border-radius:13px;aspect-ratio:3/4;max-height:65vh;display:grid;place-items:center}.view video{width:100%;height:100%;object-fit:contain;background:#02060b}.view .guide{position:absolute;width:64%;aspect-ratio:1;border:2px solid rgba(98,239,176,.8);border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,.08);pointer-events:none}.view .guide:after{content:'Aim at the QR · can scan outside box';position:absolute;bottom:-29px;left:-25%;width:150%;text-align:center;font-size:.72rem;color:#e1f3ea;text-shadow:0 1px 4px #000}.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.controls button{flex:1}button,select{font:inherit;border:1px solid #627b96;background:#263e59;color:white;border-radius:10px;min-height:44px;padding:10px}button.primary{background:#13764e;border-color:#35b47a}button:disabled{opacity:.42}label{display:block;margin:10px 0 6px}select{width:100%}#result{padding:14px;border-radius:12px;background:#263b54;min-height:60px;text-align:center;display:grid;place-items:center;font-weight:650;overflow-wrap:anywhere}#result.ok{background:#0d5537}#result.warn{background:#65471c}#result.err{background:#652a30}#diag{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.82rem;line-height:1.45}#log{list-style:none;margin:8px 0;padding:0;max-height:240px;overflow:auto}#log li{border-bottom:1px solid #31455e;padding:9px 0}input[type=range]{width:100%}.help{line-height:1.5;font-size:.88rem}h2{font-size:1.05rem;margin:0 0 8px}
 /* Scan confirmation: brief green frame and checkmark; detection only, not backend registration. */
@@ -26,8 +26,8 @@
 <p class="help muted">For 1.5–2 cm QR codes: hold the card steady, use good lighting, and start around 15–30 cm away. Move closer if the code is too small or blurred. The whole video frame is scanned, not only the green square.</p>
 <p id="diag" class="muted" aria-live="polite"></p>
 </section>
-<section><div id="result" role="status" aria-live="polite">Configure endpoint below, then start scanning</div><p class="muted" id="count">Registered: 0</p></section>
-<section><h2>Connection settings</h2><label for="endpoint">Apps Script Web App /exec URL</label><input id="endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;min-height:44px;background:#263e59;color:white;border:1px solid #627b96;border-radius:10px;padding:10px"><label for="deviceId">Approved device ID</label><input id="deviceId" value="TEST_DEVICE" style="width:100%;min-height:44px;background:#263e59;color:white;border:1px solid #627b96;border-radius:10px;padding:10px"><button id="saveSettings">Save connection settings</button><p class="muted help">The URL and device ID are saved on this phone only. Device IDs are identifiers, not strong authentication.</p></section><section><h2>Recent scan results</h2><ul id="log"></ul><button id="clear">Clear history</button></section>
+<section><div id="result" role="status" aria-live="polite">Ready to scan</div><p class="muted" id="count">Registered: 0</p></section>
+<section><h2>Recent scan results</h2><ul id="log"></ul><button id="clear">Clear history</button></section>
 <canvas id="canvas" hidden></canvas>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
@@ -45,15 +45,14 @@ function flashSuccess(){const view=el('cameraView');clearTimeout(flashTimer);vie
 // Cross-origin form POST into a hidden iframe. Apps Script replies with postMessage.
 // No fetch() / CORS preflight is needed; responses are matched to a random nonce.
 let pending=false, recent=new Map(), pendingTimer=null, frame=null;
-const deviceInput=el('deviceId'), endpointInput=el('endpoint');
-endpointInput.value=localStorage.getItem('lunchEndpoint')||'';
-deviceInput.value=localStorage.getItem('lunchDevice')||'TEST_DEVICE';
-el('saveSettings').onclick=()=>{localStorage.setItem('lunchEndpoint',endpointInput.value.trim());localStorage.setItem('lunchDevice',deviceInput.value.trim());result('Connection settings saved');};
+// Set this once in the GitHub source. Phones connect automatically.
+const LUNCH_API_URL = 'https://script.google.com/macros/s/AKfycbwICcl1iDtTQ9lZezkub9UdQBz-K0prcHlqPZArFLQ3-EXN9c1SL1Jrdq_r_71wcXQV/exec';
+const LUNCH_DEVICE_ID = 'TEST_DEVICE';
 function feedback(kind){const v=el('cameraView');v.classList.remove('scan-success','scan-duplicate','scan-error');void v.offsetWidth;v.classList.add(kind);clearTimeout(flashTimer);flashTimer=setTimeout(()=>v.classList.remove(kind),1100)}
 function logResult(id, message){const li=document.createElement('li');li.textContent=new Date().toLocaleTimeString()+' — '+id+' — '+message;el('log').prepend(li);while(el('log').children.length>20)el('log').lastChild.remove()}
 function postLunch(id){return new Promise((resolve,reject)=>{
-  const endpoint=endpointInput.value.trim(),device=deviceInput.value.trim();
-  if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/.test(endpoint))return reject(Error('Enter the deployed Apps Script /exec URL'));
+  const endpoint=LUNCH_API_URL,device=LUNCH_DEVICE_ID;
+  if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/.test(endpoint)||endpoint.includes('REPLACE_WITH'))return reject(Error('Scanner URL is not configured in index.html'));
   if(!device)return reject(Error('Enter an approved device ID'));
   const nonce=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
   const iframe=document.createElement('iframe');iframe.name='lunch_reply_'+Date.now();iframe.style.display='none';document.body.appendChild(iframe);frame=iframe;
@@ -64,8 +63,8 @@ function postLunch(id){return new Promise((resolve,reject)=>{
   document.body.appendChild(form);
   let settled=false;
   const finish=(err,data)=>{if(settled)return;settled=true;clearTimeout(pendingTimer);window.removeEventListener('message',handler);form.remove();setTimeout(()=>iframe.remove(),500);frame=null;err?reject(err):resolve(data)};
-  const handler=e=>{if(e.source!==iframe.contentWindow)return;if(!e.data||e.data.type!=='LUNCH_RESULT'||e.data.nonce!==nonce)return;
-    // Apps Script HtmlService iframe responses normally originate from googleusercontent.com.
+  const handler=e=>{if(!e.data||e.data.type!=='LUNCH_RESULT'||e.data.nonce!==nonce)return;
+    // Apps Script may nest the response in a Google-owned iframe; nonce matches this request.
     if(!/^https:\/\/([a-z0-9-]+\.)*googleusercontent\.com$/.test(e.origin) && !/^https:\/\/script\.google\.com$/.test(e.origin))return;
     finish(null,e.data.result)};
   window.addEventListener('message',handler);

@@ -52,7 +52,7 @@ function flashSuccess(){const view=el('cameraView');clearTimeout(flashTimer);vie
 // No fetch() / CORS preflight is needed; responses are matched to a random nonce.
 let pending=false, recent=new Map(), pendingTimer=null, frame=null;
 // Set this once in the GitHub source. Phones connect automatically.
-const LUNCH_API_URL = 'https://script.google.com/macros/s/REPLACE_WITH_DEPLOYMENT_ID/exec';
+const LUNCH_API_URL = 'https://script.google.com/macros/s/AKfycbwICcl1iDtTQ9lZezkub9UdQBz-K0prcHlqPZArFLQ3-EXN9c1SL1Jrdq_r_71wcXQV/exec';
 const LUNCH_DEVICE_ID = 'ROOM_GATE_01';
 function feedback(kind){const v=el('cameraView');v.classList.remove('scan-success','scan-duplicate','scan-error');void v.offsetWidth;v.classList.add(kind);clearTimeout(flashTimer);flashTimer=setTimeout(()=>v.classList.remove(kind),1100)}
 function logResult(id, message){const li=document.createElement('li');li.textContent=new Date().toLocaleTimeString()+' — '+id+' — '+message;el('log').prepend(li);while(el('log').children.length>20)el('log').lastChild.remove()}
